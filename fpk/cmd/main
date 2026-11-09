@@ -1,0 +1,21 @@
+#!/bin/bash
+# 飞牛应用中心生命周期。Docker 的启停由应用中心按 compose 处理。
+# status 用本机 8787 健康检查，避免脚本没有 docker 权限时一直显示停用。
+
+case "$1" in
+  start|stop)
+    exit 0
+    ;;
+  status)
+    if wget -qO- --timeout=3 "http://127.0.0.1:8787/health" >/dev/null 2>&1; then
+      exit 0
+    fi
+    if curl -fsS --max-time 3 "http://127.0.0.1:8787/health" >/dev/null 2>&1; then
+      exit 0
+    fi
+    exit 3
+    ;;
+  *)
+    exit 1
+    ;;
+esac

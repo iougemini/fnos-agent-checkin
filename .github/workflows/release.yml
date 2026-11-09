@@ -1,0 +1,104 @@
+name: Release image and fnOS package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image name and version
+        id: meta
+        run: |
+          set -euo pipefail
+          image="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            latest=1
+          else
+            version="manual"
+            latest=0
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<EOF"
+            echo "${image}:${version}"
+            if [ "$latest" = 1 ]; then
+              echo "${image}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            NPM_REGISTRY=https://registry.npmjs.org
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  fpk:
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pack fnOS fpk
+        env:
+          VERSION: ${{ needs.image.outputs.version }}
+          IMAGE: ${{ needs.image.outputs.image }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build-fpk.sh fpk/cmd/main
+          scripts/build-fpk.sh "$VERSION" "$IMAGE" "dist/fnos-agent-checkin-${VERSION}.fpk"
+          python3 - << PY
+          import json, os
+          from pathlib import Path
+          version = os.environ["VERSION"]
+          image = os.environ["IMAGE"]
+          Path("dist/latest.json").write_text(json.dumps({
+              "version": version,
+              "image": f"{image}:{version}",
+              "fpk": f"fnos-agent-checkin-{version}.fpk",
+          }, ensure_ascii=False, indent=2) + "\n")
+          PY
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/fnos-agent-checkin-*.fpk
+            dist/fnos-agent-checkin-*.fpk.sha256
+            dist/latest.json
+          generate_release_notes: true
+          fail_on_unmatched_files: true

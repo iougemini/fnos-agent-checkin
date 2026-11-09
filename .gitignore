@@ -1,0 +1,11 @@
+node_modules/
+data/
+.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+npm-debug.log
+*.fpk
+*.fpk.sha256
+dist/
+fpk/app.tgz

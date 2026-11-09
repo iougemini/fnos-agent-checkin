@@ -1,0 +1,40 @@
+# 使用本机已经导入的镜像 fnos-agent-checkin:latest，不再构建。
+# 从 GHCR 拉取请改用 docker-compose.ghcr.yml，不要用这一份。
+# 环境变量仍然放在同目录的 .env 里。
+
+services:
+  checkin:
+    image: fnos-agent-checkin:latest
+    container_name: fnos-agent-checkin
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      TZ: Asia/Shanghai
+      PORT: "8787"
+      DATA_DIR: /data
+      HOST: 0.0.0.0
+      NODE_OPTIONS: --experimental-sqlite
+      MASTER_KEY: ${MASTER_KEY:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_ENABLED: ${CRON_ENABLED:-1}
+      CRON_CATCHUP: ${CRON_CATCHUP:-1}
+      CRON_JITTER_MIN_SEC: ${CRON_JITTER_MIN_SEC:-0}
+      CRON_JITTER_MAX_SEC: ${CRON_JITTER_MAX_SEC:-900}
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TG_CHAT_ID: ${TG_CHAT_ID:-}
+      TG_API_BASE: ${TG_API_BASE:-}
+      QQ_APP_ID: ${QQ_APP_ID:-}
+      QQ_APP_SECRET: ${QQ_APP_SECRET:-}
+      QQ_OPENID: ${QQ_OPENID:-}
+      QQ_SANDBOX: ${QQ_SANDBOX:-}
+      QODER_MACHINE_TOKEN: ${QODER_MACHINE_TOKEN:-}
+      QODER_MACHINE_CODE: ${QODER_MACHINE_CODE:-}
+      QODER_MACHINE_TYPE: ${QODER_MACHINE_TYPE:-}
+    volumes:
+      - fnos-agent-checkin-data:/data
+
+volumes:
+  fnos-agent-checkin-data:
+    name: fnos-agent-checkin-data

@@ -1,0 +1,21 @@
+{
+  "name": "fnos-agent-checkin",
+  "version": "1.0.0",
+  "private": false,
+  "license": "GPL-3.0-only",
+  "description": "Trae + WorkBuddy + Qoder 每日签到控制台，供飞牛 OS Docker 长期运行。",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node --experimental-sqlite src/server.js",
+    "test": "node --experimental-sqlite --test test/*.test.mjs",
+    "gen-key": "node scripts/gen-master-key.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "hono": "^4.10.4",
+    "node-cron": "^3.0.3"
+  }
+}

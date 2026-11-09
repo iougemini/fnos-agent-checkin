@@ -1,0 +1,11 @@
+[
+  {
+    "stepTitle": "每日签到",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "这是 Trae、WorkBuddy、Qoder 的非官方签到控制台。安装包不含镜像，飞牛会从 GHCR 拉取。装好后请在应用的环境变量里填写 MASTER_KEY 和 ADMIN_TOKEN，否则控制台无法保存账号。定时、通知都可以在网页里再改。"
+      }
+    ]
+  }
+]

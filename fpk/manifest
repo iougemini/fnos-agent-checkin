@@ -1,0 +1,14 @@
+appname = fnos-agent-checkin
+version = 0.0.0
+display_name = 每日签到
+desc = Trae、WorkBuddy、Qoder 每日签到控制台。镜像在安装时从 GHCR 拉取，不内置在安装包里。
+platform = all
+source = thirdparty
+maintainer = community
+os_min_version = 0.9.0
+
+desktop_uidir = ui
+desktop_applaunchname = fnos-agent-checkin.Application
+service_port = 8787
+checkport = true
+ctl_stop = true

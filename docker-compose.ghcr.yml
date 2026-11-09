@@ -1,0 +1,41 @@
+# 使用 GitHub Actions 推到 GHCR 的镜像，不在飞牛上构建。
+# 把 OWNER 换成你的 GitHub 用户名或组织名，仓库名保持 fnos-agent-checkin，
+# 或者整行换成 Actions 日志里的 ghcr.io/${{ github.repository }}（必须全小写）。
+# 环境变量放在同目录的 .env，或填进飞牛 Compose 的环境变量表。
+
+services:
+  checkin:
+    image: ghcr.io/OWNER/fnos-agent-checkin:latest
+    container_name: fnos-agent-checkin
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      TZ: Asia/Shanghai
+      PORT: "8787"
+      DATA_DIR: /data
+      HOST: 0.0.0.0
+      NODE_OPTIONS: --experimental-sqlite
+      MASTER_KEY: ${MASTER_KEY:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_ENABLED: ${CRON_ENABLED:-1}
+      CRON_CATCHUP: ${CRON_CATCHUP:-1}
+      CRON_JITTER_MIN_SEC: ${CRON_JITTER_MIN_SEC:-0}
+      CRON_JITTER_MAX_SEC: ${CRON_JITTER_MAX_SEC:-900}
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TG_CHAT_ID: ${TG_CHAT_ID:-}
+      TG_API_BASE: ${TG_API_BASE:-}
+      QQ_APP_ID: ${QQ_APP_ID:-}
+      QQ_APP_SECRET: ${QQ_APP_SECRET:-}
+      QQ_OPENID: ${QQ_OPENID:-}
+      QQ_SANDBOX: ${QQ_SANDBOX:-}
+      QODER_MACHINE_TOKEN: ${QODER_MACHINE_TOKEN:-}
+      QODER_MACHINE_CODE: ${QODER_MACHINE_CODE:-}
+      QODER_MACHINE_TYPE: ${QODER_MACHINE_TYPE:-}
+    volumes:
+      - fnos-agent-checkin-data:/data
+
+volumes:
+  fnos-agent-checkin-data:
+    name: fnos-agent-checkin-data
