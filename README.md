@@ -47,7 +47,7 @@ openssl rand -base64 32
 btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
 ```
 
-结果一般是 **44 个字符、以 `=` 结尾**。存进密码管理器。**`MASTER_KEY` 丢了，库里的令牌全部解不开，只能重新扫码。** 换密钥不会迁移旧数据。`.env` 不要提交到 git。
+结果一般是 **44 个字符、以 `=` 结尾**。存进密码管理器。**`MASTER_KEY` 丢了，库里的令牌全部解不开，只能重新扫码。** 换密钥不会迁移旧数据。
 
 ### A. 飞牛 Docker Compose，在 NAS 上构建
 
