@@ -1,21 +1,22 @@
 # 安装时由 CI 把 OWNER 换成 github.repository（小写）。
 # 镜像在飞牛启动容器时拉取，不打进 fpk。
+# 向导字段 wizard_* 由应用中心注入，映射为容器环境变量。
 services:
   checkin:
     image: ghcr.io/OWNER/fnos-agent-checkin:latest
     container_name: fnos-agent-checkin
     restart: unless-stopped
     ports:
-      - "8787:8787"
+      - "${wizard_port:-8787}:8787"
     environment:
       TZ: Asia/Shanghai
       PORT: "8787"
       DATA_DIR: /data
       HOST: 0.0.0.0
       NODE_OPTIONS: --experimental-sqlite
-      MASTER_KEY: ${MASTER_KEY:-}
-      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
-      CRON_SECRET: ${CRON_SECRET:-}
+      MASTER_KEY: ${wizard_master_key}
+      ADMIN_TOKEN: ${wizard_admin_token}
+      CRON_SECRET: ${wizard_cron_secret:-}
       CRON_ENABLED: ${CRON_ENABLED:-1}
       CRON_CATCHUP: ${CRON_CATCHUP:-1}
       CRON_JITTER_MIN_SEC: ${CRON_JITTER_MIN_SEC:-0}

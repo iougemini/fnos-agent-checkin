@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "可选，例如 v1.0.0。填写后创建该 Release 并附上 fpk，同时推送该版本镜像和 :latest。留空则只上传 Artifact，镜像标签为 manual。"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -25,11 +30,20 @@ jobs:
 
       - name: Image name and version
         id: meta
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           image="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="${GITHUB_REF_NAME#v}"
+            latest=1
+          elif [[ -n "${RELEASE_TAG}" ]]; then
+            if [[ ! "$RELEASE_TAG" =~ ^v[0-9] ]]; then
+              echo "release_tag 必须以 v 加数字开头，例如 v1.0.0" >&2
+              exit 1
+            fi
+            version="${RELEASE_TAG#v}"
             latest=1
           else
             version="manual"
@@ -92,13 +106,25 @@ jobs:
           }, ensure_ascii=False, indent=2) + "\n")
           PY
 
+      - name: Upload fpk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fnos-agent-checkin-${{ needs.image.outputs.version }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            dist/fnos-agent-checkin-${{ needs.image.outputs.version }}.fpk
+            dist/fnos-agent-checkin-${{ needs.image.outputs.version }}.fpk.sha256
+            dist/latest.json
+
       - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
           files: |
-            dist/fnos-agent-checkin-*.fpk
-            dist/fnos-agent-checkin-*.fpk.sha256
+            dist/fnos-agent-checkin-${{ needs.image.outputs.version }}.fpk
+            dist/fnos-agent-checkin-${{ needs.image.outputs.version }}.fpk.sha256
             dist/latest.json
           generate_release_notes: true
           fail_on_unmatched_files: true

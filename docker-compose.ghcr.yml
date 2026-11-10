@@ -1,11 +1,11 @@
 # 使用 GitHub Actions 推到 GHCR 的镜像，不在飞牛上构建。
-# 把 OWNER 换成你的 GitHub 用户名或组织名，仓库名保持 fnos-agent-checkin，
+# 镜像：ghcr.io/iougemini/fnos-agent-checkin；
 # 或者整行换成 Actions 日志里的 ghcr.io/${{ github.repository }}（必须全小写）。
 # 环境变量放在同目录的 .env，或填进飞牛 Compose 的环境变量表。
 
 services:
   checkin:
-    image: ghcr.io/OWNER/fnos-agent-checkin:latest
+    image: ghcr.io/iougemini/fnos-agent-checkin:latest
     container_name: fnos-agent-checkin
     restart: unless-stopped
     ports:

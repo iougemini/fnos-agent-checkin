@@ -20,7 +20,7 @@
 
 三个平台共用一套部署、一个数据库，数据按 `trae:` / `wb:` / `qoder:` 前缀隔开。
 
-仓库地址由你推送到自己的 GitHub 后决定。下文用 `ghcr.io/iougemini/fnos-agent-checkin` 做占位，把 `iougemini` 换成你的用户名或组织名。Actions 实际推送的名字是 `ghcr.io/${{ github.repository }}`，并且会转成全小写。
+预构建镜像：`ghcr.io/iougemini/fnos-agent-checkin`。
 
 ---
 
@@ -41,10 +41,6 @@
 openssl rand -base64 32
 ```
 
-```bash
-node scripts/gen-master-key.mjs
-```
-
 浏览器控制台也可以：
 
 ```js
@@ -55,19 +51,12 @@ btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
 
 ### A. 飞牛 Docker Compose，在 NAS 上构建
 
-适合改过代码、或还没有 GHCR 镜像的时候。目录里要有 `docker-compose.yml`、`Dockerfile`、`package.json`、`src/`。
+适合改过代码、或还没有现成镜像的时候。目录里要有 `docker-compose.yml`、`Dockerfile`、`package.json`、`src/`。
 
 1. 把项目放到飞牛，例如 `/vol1/1000/docker/checkin`。
 2. `cp .env.example .env`，填好 `MASTER_KEY` 和 `ADMIN_TOKEN`。
 3. 打开飞牛 **Docker → Compose**（有的版本叫「编排」或「项目」），新建项目，路径指向该目录，或把 `docker-compose.yml` 粘进编辑器。飞牛若另有环境变量表，把 `.env` 按同名填进去。
-4. 启动。第一次会拉取 `node:22`，默认用国内 npm 源安装依赖。想改官方源：
-
-```bash
-NPM_REGISTRY=https://registry.npmjs.org docker compose build
-docker compose up -d
-```
-
-也可以直接：
+4. 启动：
 
 ```bash
 docker compose up -d --build
@@ -76,22 +65,13 @@ docker compose logs -f checkin
 
 5. 浏览器打开 `http://飞牛的局域网IP:8787`，密码是 `ADMIN_TOKEN`。
 
-### B. 拉取 GHCR 预构建镜像
+### B. 拉取预构建镜像
 
-推送 `v*` 标签后，Actions 会构建 `linux/amd64` 和 `linux/arm64`，并推到：
-
-```text
-ghcr.io/${{ github.repository }}:latest
-ghcr.io/${{ github.repository }}:1.2.3
-```
-
-版本号去掉标签前面的 `v`。用仓库里的 `docker-compose.ghcr.yml`，把占位镜像改成你的：
+用仓库里的 `docker-compose.ghcr.yml`：
 
 ```yaml
 image: ghcr.io/iougemini/fnos-agent-checkin:latest
 ```
-
-然后：
 
 ```bash
 cp .env.example .env
@@ -99,17 +79,24 @@ cp .env.example .env
 docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-第一次推送后，GitHub 上的包默认可能是私有的。到 Packages 里把 `fnos-agent-checkin` 设成公开，否则飞牛拉不到。组织仓库还要给 Actions 的 `GITHUB_TOKEN` 打开 packages 写权限。
+如果拉取失败，多半是包还是私有的，或镜像名大小写不对。
 
-`docker-compose.image.yml` 是另一种用法：镜像名固定为本地的 `fnos-agent-checkin:latest`，适合 `docker load` 导入 tar，不走 GHCR。
+`docker-compose.image.yml` 适合本机已有 `fnos-agent-checkin:latest`（例如 `docker load` 导入），不走 GHCR。
 
 ### C. 飞牛应用中心导入 `.fpk`
 
-发布页会附上 `fnos-agent-checkin-<版本>.fpk`。飞牛 **应用中心 → 手动安装**，选这个文件。
+从 [Release](https://github.com/iougemini/fnos-agent-checkin/releases) 下载 `fnos-agent-checkin-<版本>.fpk`，在飞牛 **应用中心 → 手动安装** 选这个文件。
 
-这是社区打包，**安装包里没有镜像**。安装时飞牛按包内 compose 从 GHCR 拉取。装好后如果控制台提示缺少 `MASTER_KEY` / `ADMIN_TOKEN`，到该应用的环境变量里补上这两项再启动。Docker Compose 仍是更稳妥的安装方式。
+安装包里没有镜像，安装时会从 GHCR 拉取。安装向导会要求填写：
 
-`.fpk` 优先用官方 `fnpack` 1.2.3 打；工具下不到或校验失败时，工作流改用 tar.gz（飞牛的 fpk 本质就是 tar.gz，不是 zip）。
+| 向导字段 | 对应变量 | 说明 |
+| --- | --- | --- |
+| 控制台登录密码 | `ADMIN_TOKEN` | 必填 |
+| 加密密钥 | `MASTER_KEY` | 必填，用 `openssl rand -base64 32` 生成 |
+| 服务端口 | 宿主机端口 | 默认 `8787`，容器内仍是 8787 |
+| 定时任务口令 | `CRON_SECRET` | 可选，留空则用控制台密码 |
+
+Telegram / QQ / 定时时间装好后在网页控制台再配。以后改密码、密钥或端口：到该应用的 **设置**。Docker Compose 部署方式不变，仍用 `.env`。
 
 默认端口 **8787**。只改映射的主机端口时，容器内保持 8787。防火墙放行对应 TCP 端口。
 
@@ -134,7 +121,6 @@ docker compose -f docker-compose.ghcr.yml up -d
 | `TG_API_BASE` | 否 | Telegram API 根地址。留空用 `https://api.telegram.org`。反代填 `https://你的域名`，实际请求是 `<TG_API_BASE>/bot<token>/sendMessage` |
 | `QQ_APP_ID` / `QQ_APP_SECRET` / `QQ_OPENID` / `QQ_SANDBOX` | 否 | QQ 机器人默认值 |
 | `QODER_MACHINE_TOKEN` / `QODER_MACHINE_CODE` / `QODER_MACHINE_TYPE` | 否 | 国际版 Qoder 的设备通行证**回退值**。账号自己还没保存通行证时才会用。国内版账号不用这三项 |
-| `NPM_REGISTRY` | 否 | 本地构建镜像时的 npm 源，默认 `https://registry.npmmirror.com`。GitHub Actions 构建改用 `registry.npmjs.org` |
 
 没配 `MASTER_KEY` 或 `ADMIN_TOKEN` 时容器仍会启动。`/health` 的 `ready` 为 `false`。
 
@@ -148,19 +134,12 @@ docker compose -f docker-compose.ghcr.yml up -d
 - 编辑北京时间 `HH:MM`，1 到 8 个，不能重复。默认 **08:10** 和 **10:20**
 - 设置随机延迟下限和上限，单位秒，默认 **0** 和 **900**
 
-**保存** 写入 SQLite 的 `cron:config`，并立刻卸掉旧的 cron、挂上新的，不用重建容器。日志类似：
+**保存** 后立刻生效，不用重建容器。
 
-```text
-[cron] 控制台已保存定时设置：08:10、10:20
-[cron] 已按控制台重新挂上定时：Asia/Shanghai 每天 08:10、10:20，触发后再随机等 0–900 秒
-```
-
-取消则不保存。还没保存过时，接口里的 `fromEnv` 为 `true`，用的是环境变量默认值。保存后再打开就是数据库里的配置。
-
-只有这些到点触发的定时会随机等待，日志里有 `抽到延迟 N 秒`。下面三种不等待：
+只有到点触发的定时会随机等待。下面三种不等待：
 
 - 手动 `POST /cron`
-- 控制台「全部签到」（`force=1`）
+- 控制台「全部签到」
 - 启动补跑，以及保存时顺手补跑今天已过点、还没成功的时间
 
 10:20 这轮的默认意义是：Qoder 的活动常常 10:00 后才下发，前一轮已经领过的账号会跳过。你改掉时间之后，仍是每个时间点把三个平台都跑一遍。
@@ -176,29 +155,9 @@ curl -sS -X POST "http://127.0.0.1:8787/cron" \
 curl -sS -X POST "http://127.0.0.1:8787/cron?key=你的CRON_SECRET"
 ```
 
-口令错了返回 401 `{"error":"口令不对"}`。通知失败只记在 `notifyError`，不影响签到结果。
+口令错了返回 401。通知失败不影响签到结果。
 
-`GET /health` 不需要登录，能看到当前生效的时间点和抖动：
-
-```json
-{
-  "ok": true,
-  "ready": true,
-  "timezone": "Asia/Shanghai",
-  "cron": {
-    "enabled": true,
-    "catchup": true,
-    "jitterMinSec": 0,
-    "jitterMaxSec": 900,
-    "slots": [
-      { "id": "0810", "time": "08:10", "today": "ok 2026-11-09T00:10:01.000Z" },
-      { "id": "1020", "time": "10:20", "today": null }
-    ]
-  }
-}
-```
-
-`today` 以 `ok` 开头表示这一轮今天已经跑完。
+`GET /health` 不需要登录，能看到当前生效的时间点。
 
 ---
 
@@ -225,11 +184,8 @@ curl -sS -X POST "http://127.0.0.1:8787/cron?key=你的CRON_SECRET"
 | 按钮 | 添加账号（国内版） | 添加账号（国际版） |
 | 授权页 | `https://qoder.com.cn` | `https://qoder.com` |
 | 接口 | `https://openapi.qoder.com.cn` | `https://openapi.qoder.sh` |
-| 语言 | `zh-CN` | `en-US` |
-| client_id | 不带 | `e883ade2-e6e3-4d6d-adf7-f92ceff5fdcb` |
-| redirect_uri | 不带 | 不带，避免把浏览器交给本机客户端 |
 
-国际版如果提示只有营销活动或缺少设备通行证，不用删账号。活动接口没有官方 `runtime-info` 身份时仍返回 200，但只有营销卡，没有「每天领 100 Credits」。在装了**国际版** Qoder 的电脑上运行 `runtime-info`，环境参数是 **3**（国内版是 0，不能混用），把 JSON 贴到该账号的「设备通行证」再签到。
+国际版如果提示只有营销活动或缺少设备通行证，不用删账号。在装了**国际版** Qoder 的电脑上运行 `runtime-info`，环境参数是 **3**（国内版是 0，不能混用），把 JSON 贴到该账号的「设备通行证」再签到。
 
 ```bash
 # Linux
@@ -274,11 +230,11 @@ node openid-helper.mjs <AppID> <AppSecret>
 
 Compose 使用命名卷 **`fnos-agent-checkin-data`**，挂到容器 `/data`，库文件是 `/data/checkin.sqlite`。
 
-- 重启、重建容器、`docker compose up -d --build` 都不会丢掉这个卷。
+- 重启、重建容器都不会丢掉这个卷。
 - `docker compose down` 默认也不删卷。`docker compose down -v` 或在飞牛里删存储卷才会没。
 - 备份卷的同时备份 `MASTER_KEY`。
 
-想在文件管理里直接看到库，把卷改成绑定目录，并删掉 compose 底部的 `volumes:` 段：
+想在文件管理里直接看到库，可以把卷改成绑定目录，并删掉 compose 底部的 `volumes:` 段：
 
 ```yaml
 volumes:
@@ -289,91 +245,31 @@ volumes:
 
 ---
 
-## 接口
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/` | 控制台 |
-| GET | `/health` | 存活检查，不需要登录。含当前定时时间点 |
-| POST | `/cron` | 三个平台签到，口令放 `X-Cron-Secret` 或 `?key=`。不等待抖动 |
-| GET | `/api/ping` | 校验登录密码 |
-| POST | `/api/run-all` | 三个平台一起签，`?force=1` 强制。不等待抖动 |
-| GET/POST | `/api/schedule` | 读 / 写定时设置。要管理员口令。POST 保存后热更新 cron |
-| GET/POST | `/api/notify` | 读 / 写通知配置 |
-| POST | `/api/notify/test` | 发一条测试通知 |
-| * | `/trae/api/*` | Trae |
-| * | `/wb/api/*` | WorkBuddy |
-| * | `/qoder/api/*` | Qoder，含 `/qoder/api/device` 保存国际版通行证 |
-| GET | `/oauth/callback` | Trae 回调（必须在根路径） |
-| GET | `/qq/openid-helper.mjs` | 取 QQ OpenID 的本机脚本 |
-
----
-
-## 本机不装 Docker 时
-
-需要 Node.js 22 或更新。
-
-```bash
-npm install
-cp .env.example .env
-npm start
-npm test
-```
-
-默认监听 `0.0.0.0:8787`，数据在项目下的 `data/checkin.sqlite`。
-
----
-
-## GitHub Actions / 发布
-
-工作流在 `.github/workflows/release.yml`。
-
-- 触发：推送 `v*` 标签，或手动 `workflow_dispatch`
-- 权限：`contents: write`、`packages: write`。只用 `GITHUB_TOKEN`，不要额外的密钥
-- 镜像：Buildx 构建 `linux/amd64,linux/arm64`，推到 `ghcr.io/${{ github.repository }}`（全小写）
-- 标签：打 tag 时同时推 `:latest` 和去掉 `v` 的版本号；手动运行只推 `:manual`，不覆盖 `:latest`
-- fnOS：同一工作流调用 `scripts/build-fpk.sh`。它把 compose 里的 `ghcr.io/iougemini/fnos-agent-checkin` 换成本次仓库，写入 manifest 版本，生成 `app.tgz`，再优先用校验过的 `fnpack` 1.2.3 打包。失败则退回 tar.gz
-- `v*` 标签会开 GitHub Release，附上 `fnos-agent-checkin-<版本>.fpk`、对应 `.sha256` 和 `latest.json`
-
-本地试打包：
-
-```bash
-scripts/build-fpk.sh 0.0.0 ghcr.io/iougemini/fnos-agent-checkin dist/fnos-agent-checkin-0.0.0.fpk
-```
-
----
-
 ## 常见问题
 
 | 现象 | 处理 |
 | --- | --- |
-| 页面提示未配置 `ADMIN_TOKEN` / `MASTER_KEY` | 名字要完全一致。改完后让容器重新读到环境变量 |
+| 页面提示未配置 `ADMIN_TOKEN` / `MASTER_KEY` | Compose：检查 `.env` 名字是否完全一致并重建容器。应用中心 `.fpk`：到应用 **设置** 填安装/配置向导里的密码与密钥 |
 | `MASTER_KEY` 必须是 32 字节 | 重新生成，确认是 base64，不要多空格、不要带引号 |
 | 容器一直重启 | 看日志。常见是 8787 被占用，或镜像没拉下来 |
-| GHCR 拉取 401 / 找不到包 | 包还是私有的，或镜像名大小写不对 |
-| 构建时 npm 很慢 | 本地构建换 `NPM_REGISTRY=https://registry.npmjs.org` |
+| 拉取镜像 401 / 找不到包 | 包还是私有的，或镜像名大小写不对 |
 | 列表是空的 | 还没加账号，或定时还没到 |
 | Trae 扫码后停在「无法访问此网站」 | 正常。复制地址栏整段链接回来粘贴 |
 | 粘贴后提示没找到 authCodeInfo | `?` 后面没复制全 |
 | 显示限流 | 等冷却结束，或手动再跑 |
 | 令牌失效 | 删掉该账号，重新添加 |
 | 改了 `MASTER_KEY` 之后账号都打不开 | 旧密文解不开。改回原来的密钥，或删库重新扫码 |
-| 定时没跑 | 看控制台「定时」是否开启，以及 `GET /health` 的 `slots[].today`。日志搜 `[cron]` |
+| 定时没跑 | 看控制台「定时」是否开启，以及 `GET /health`。日志搜 `[cron]` |
 | 改了定时却还是旧时间 | 确认点过保存。保存前用的是环境变量默认值 |
 | 飞牛重启后没有马上签 | 开机时若开启了补跑，会补今天已过点的轮次，且不等待抖动 |
-| 应用中心安装 fpk 失败 | 看是不是「解压 app.tgz 失败」。用 Release 里的包，不要自己把目录压成 zip |
-
-Qoder 排查可以看 `GET /qoder/api/inspect?id=<账号id>`（要带登录密码）。
 
 ---
 
 ## 说明
 
-这不是 Trae、WorkBuddy、Qoder 的官方客户端。接口来自逆向，对方升级后可能要跟着改 `src/worker.js`。只做签到，不做长期任务或兑换。建议只挂自己的账号。
+这不是 Trae、WorkBuddy、Qoder 的官方客户端。接口来自逆向，对方升级后可能失效。只做签到，不做长期任务或兑换。建议只挂自己的账号。
 
-令牌在签到那一刻会在进程内存里是明文。数据库里的账号和通知是密文。登录密码和账号令牌分开存。不要把 8787 暴露到公网；要暴露就放到你信任的反代和访问控制后面。
-
-定时配置不含密钥。GitHub Actions 不会把 `.env` 打进镜像或 fpk。
+令牌在签到那一刻会在进程内存里是明文。数据库里的账号和通知是密文。不要把 8787 暴露到公网；要暴露就放到你信任的反代和访问控制后面。
 
 ---
 
@@ -381,4 +277,4 @@ Qoder 排查可以看 `GET /qoder/api/inspect?id=<账号id>`（要带登录密�
 
 签到流程、控制台和三个平台的对接，来自 [ggzhzc/workbuddy-trae-checkin](https://github.com/ggzhzc/workbuddy-trae-checkin)。感谢上游把 Trae、WorkBuddy、Qoder 的每日签到收成一个 Cloudflare Worker。
 
-本仓库是在此之上的非官方 Docker / 飞牛移植：换成常驻进程、SQLite、可在网页里改的定时，以及 GHCR / fnOS 安装包。这个移植本身使用 **GPL-3.0-only**：再发布改过的版本时，要让接收者能拿到同样以 GPL-3.0 授权的源代码。上游仓库没有许可证文件，这里不把上游称为 GPL；沿用它的代码时，请同时尊重该项目的说明。
+本仓库是在此之上的非官方 Docker / 飞牛移植：换成常驻进程、SQLite、可在网页里改的定时。以 **GPL-3.0-only** 发布；再发布改过的版本时，要让接收者能拿到同样以 GPL-3.0 授权的源代码。上游仓库没有许可证文件，这里不把上游称为 GPL；沿用它的代码时，请同时尊重该项目的说明。
